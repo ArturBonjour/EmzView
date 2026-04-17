@@ -2,7 +2,7 @@ import mongoose from 'mongoose';
 
 const movieSchema = new mongoose.Schema(
   {
-    tmdbId: { type: Number, required: true, unique: true, index: true },
+    tmdbId: { type: Number, required: true, index: true },
     mediaType: { type: String, enum: ['movie', 'tv'], required: true },
     title: { type: String, required: true },
     overview: { type: String, default: '' },
@@ -16,5 +16,7 @@ const movieSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
+movieSchema.index({ tmdbId: 1, mediaType: 1 }, { unique: true });
 
 export const Movie = mongoose.model('Movie', movieSchema);

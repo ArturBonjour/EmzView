@@ -89,8 +89,12 @@ bot.action('menu:main', async (ctx) => {
 });
 
 async function sendRecommendation(ctx, jwt, params = {}) {
-  const { data } = await backend.get('/api/recommendations/for-you', {
-    params: { limit: 1, ...params },
+  const mood = typeof params?.mood === 'string' ? params.mood : null;
+  const endpoint = mood ? '/api/recommendations/mood' : '/api/recommendations/for-you';
+  const requestParams = mood ? { mood, limit: 1 } : { limit: 1 };
+
+  const { data } = await backend.get(endpoint, {
+    params: requestParams,
     headers: { Authorization: `Bearer ${jwt}` },
   });
 
@@ -111,7 +115,7 @@ async function sendRecommendation(ctx, jwt, params = {}) {
         Markup.button.callback('👎 Дизлайк', `rate:dislike:${r.tmdbId}:${r.mediaType}`)
       ],
       [
-        Markup.button.url('🌐 На сайте', `${process.env.FRONTEND_URL || 'http://localhost:5173'}/movie/${r.tmdbId}`),
+        Markup.button.url('🌐 На сайте', `${process.env.FRONTEND_URL || 'http://localhost:5173'}/${r.mediaType || 'movie'}/${r.tmdbId}`),
         Markup.button.callback('➡️ Ещё вариант', 'menu:recommend')
       ],
       [Markup.button.callback('🏠 Главное меню', 'menu:main')]

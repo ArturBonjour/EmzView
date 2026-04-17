@@ -13,7 +13,7 @@ from app.schemas import (
     SimilarUsersRequest,
     SimilarUsersResponse,
 )
-from app.services.content import recommend_from_profile, recommend_similar, recommend_by_text
+from app.services.content import recommend_from_profile, recommend_similar, recommend_by_text, get_media_type
 from app.services.collab import recommend_for_user, recommend_from_similar_users
 
 
@@ -30,7 +30,14 @@ def recommend_for_you(req: ForYouRequest) -> ForYouResponse:
         for tmdb_id, score in recs:
             if tmdb_id in disliked:
                 continue
-            out.append(Recommendation(tmdb_id=tmdb_id, score=float(score), explanation=None))
+            out.append(
+                Recommendation(
+                    tmdb_id=tmdb_id,
+                    media_type=get_media_type(tmdb_id),
+                    score=float(score),
+                    explanation=None,
+                )
+            )
             if len(out) >= req.limit:
                 break
         return ForYouResponse(strategy=strategy, recommendations=out)
@@ -49,6 +56,7 @@ def recommend_for_you(req: ForYouRequest) -> ForYouResponse:
         out2.append(
             Recommendation(
                 tmdb_id=tmdb_id,
+                media_type=get_media_type(tmdb_id),
                 score=float(score),
                 explanation=f"Рекомендуем, потому что вам понравилось {because_seed}",
             )
@@ -66,6 +74,7 @@ def recommend_because(req: BecauseRequest) -> RecommendResponse:
         recommendations=[
             Recommendation(
                 tmdb_id=tmdb_id,
+                media_type=get_media_type(tmdb_id),
                 score=float(score),
                 explanation=f"Похоже на {req.seed.tmdb_id} по жанрам/описанию/актёрам",
             )
@@ -79,6 +88,7 @@ def recommend_mood(req: MoodRequest) -> RecommendResponse:
         "fun": "funny comedy uplifting feel good friendship adventure",
         "sad": "sad drama emotional bittersweet tragedy loss",
         "tense": "tense thriller suspense crime mystery survival",
+        "chill": "calm cozy relaxing slice of life feel good warm peaceful",
     }
 
     query = mood_queries.get(req.mood)
@@ -89,7 +99,12 @@ def recommend_mood(req: MoodRequest) -> RecommendResponse:
     return RecommendResponse(
         strategy=f"mood_{req.mood}_content_query",
         recommendations=[
-            Recommendation(tmdb_id=tmdb_id, score=float(score), explanation=f"Под настроение: {req.mood}")
+            Recommendation(
+                tmdb_id=tmdb_id,
+                media_type=get_media_type(tmdb_id),
+                score=float(score),
+                explanation=f"Под настроение: {req.mood}",
+            )
             for tmdb_id, score in sims
         ],
     )
@@ -113,6 +128,7 @@ def recommend_similar_users(req: SimilarUsersRequest) -> SimilarUsersResponse:
         out.append(
             Recommendation(
                 tmdb_id=tmdb_id,
+                media_type=get_media_type(tmdb_id),
                 score=float(score),
                 explanation="Рекомендуем, потому что это нравится пользователям с похожим вкусом",
             )

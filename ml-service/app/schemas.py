@@ -35,12 +35,13 @@ class BecauseRequest(BaseModel):
 
 
 class MoodRequest(BaseModel):
-    mood: Literal["fun", "sad", "tense"]
+    mood: Literal["fun", "sad", "tense", "chill"]
     limit: int = 20
 
 
 class Recommendation(BaseModel):
     tmdb_id: int
+    media_type: Optional[Literal["movie", "tv"]] = None
     score: float
     explanation: Optional[str] = None
 

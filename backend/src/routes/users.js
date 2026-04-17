@@ -311,9 +311,16 @@ usersRouter.get('/stats', requireAuth, async (req, res, next) => {
       Rating.countDocuments({ userId, value: -1 }),
     ]);
 
-    const likedIds = await Rating.find({ userId, value: 1 }).limit(500).lean();
-    const tmdbIds = likedIds.map((r) => r.tmdbId);
-    const movies = tmdbIds.length ? await Movie.find({ tmdbId: { $in: tmdbIds } }).lean() : [];
+    const likedIds = await Rating.find({ userId, value: 1 })
+      .select({ tmdbId: 1, mediaType: 1 })
+      .limit(500)
+      .lean();
+    const pairs = likedIds
+      .filter((r) => Number.isFinite(r?.tmdbId) && (r?.mediaType === 'movie' || r?.mediaType === 'tv'))
+      .map((r) => ({ tmdbId: r.tmdbId, mediaType: r.mediaType }));
+    const movies = pairs.length
+      ? await Movie.find({ $or: pairs.map((p) => ({ tmdbId: p.tmdbId, mediaType: p.mediaType })) }).lean()
+      : [];
 
     const genreCounts = new Map();
     for (const m of movies) {

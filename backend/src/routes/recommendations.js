@@ -198,7 +198,7 @@ recommendationsRouter.get('/because', requireAuth, async (req, res, next) => {
 
 recommendationsRouter.get('/mood', requireAuth, async (req, res, next) => {
   try {
-    const mood = z.enum(['fun', 'sad', 'tense']).parse(req.query.mood);
+    const mood = z.enum(['fun', 'sad', 'tense', 'chill']).parse(req.query.mood);
     const limit = z.coerce.number().int().min(1).max(500).default(20).parse(req.query.limit ?? '20');
     const mediaType = z.enum(['movie', 'tv']).optional().parse(req.query.type);
 
@@ -232,9 +232,14 @@ recommendationsRouter.get('/mood', requireAuth, async (req, res, next) => {
 });
 
 async function hydrateRecommendations(recommendations, mediaTypeFilter) {
-  const ids = recommendations.map((r) => r.tmdb_id);
-
-  const uniqIds = Array.from(new Set(ids)).filter((x) => Number.isFinite(x));
+  const normalized = (recommendations ?? []).map((r) => ({
+    tmdbId: Number(r?.tmdb_id),
+    mediaType: r?.media_type === 'tv' || r?.media_type === 'movie' ? r.media_type : null,
+    score: r?.score,
+    explanation: r?.explanation,
+  }));
+  const ids = normalized.map((r) => r.tmdbId).filter((x) => Number.isFinite(x));
+  const uniqIds = Array.from(new Set(ids));
 
   if (mediaTypeFilter && uniqIds.length) {
     const existing = await Movie.find({ tmdbId: { $in: uniqIds }, mediaType: mediaTypeFilter })
@@ -282,26 +287,41 @@ async function hydrateRecommendations(recommendations, mediaTypeFilter) {
     }
   }
 
-  const movies = await Movie.find({ tmdbId: { $in: ids } }).lean();
-  const byId = new Map(movies.map((m) => [m.tmdbId, m]));
+  const movieQuery = mediaTypeFilter
+    ? { tmdbId: { $in: ids }, mediaType: mediaTypeFilter }
+    : { tmdbId: { $in: ids } };
+  const movies = await Movie.find(movieQuery).lean();
+  const byKey = new Map(movies.map((m) => [`${m.mediaType}:${m.tmdbId}`, m]));
+  const byId = new Map();
+  for (const m of movies) {
+    if (!byId.has(m.tmdbId)) byId.set(m.tmdbId, m);
+  }
 
-  const becauseIds = recommendations
+  const becauseIds = normalized
     .map((r) => {
       const m = typeof r.explanation === 'string' ? r.explanation.match(/\b(\d{2,})\b/) : null;
       return m ? Number(m[1]) : null;
     })
     .filter((x) => Number.isFinite(x));
 
+  const becauseMovieQuery = mediaTypeFilter
+    ? { tmdbId: { $in: becauseIds }, mediaType: mediaTypeFilter }
+    : { tmdbId: { $in: becauseIds } };
   const becauseMovies = becauseIds.length
-    ? await Movie.find({ tmdbId: { $in: becauseIds } }).lean()
+    ? await Movie.find(becauseMovieQuery).lean()
     : [];
-  const becauseById = new Map(becauseMovies.map((m) => [m.tmdbId, m]));
+  const becauseByKey = new Map(becauseMovies.map((m) => [`${m.mediaType}:${m.tmdbId}`, m]));
+  const becauseById = new Map();
+  for (const m of becauseMovies) {
+    if (!becauseById.has(m.tmdbId)) becauseById.set(m.tmdbId, m);
+  }
 
-  const hydrated = recommendations
+  const hydrated = normalized
     .map((r) => {
-      const m = byId.get(r.tmdb_id);
+      const m = r.mediaType ? byKey.get(`${r.mediaType}:${r.tmdbId}`) : byId.get(r.tmdbId);
       if (!m) return null;
       if (mediaTypeFilter && m.mediaType !== mediaTypeFilter) return null;
+      const becauseMap = r.mediaType ? becauseByKey : becauseById;
       return {
         tmdbId: m.tmdbId,
         mediaType: m.mediaType,
@@ -309,7 +329,7 @@ async function hydrateRecommendations(recommendations, mediaTypeFilter) {
         overview: m.overview,
         posterUrl: posterUrl(m.posterPath),
         score: r.score,
-        explanation: rewriteExplanation(r.explanation, becauseById),
+        explanation: rewriteExplanation(r.explanation, becauseMap, r.mediaType),
       };
     })
     .filter(Boolean);
@@ -344,14 +364,14 @@ async function rewriteExplanationsInPlace(items) {
   await Promise.all(Array.from({ length: concurrency }, () => worker()));
 }
 
-function rewriteExplanation(explanation, becauseById) {
+function rewriteExplanation(explanation, becauseMap, mediaType) {
   if (typeof explanation !== 'string' || !explanation) return explanation ?? null;
 
   const match = explanation.match(/\b(\d{2,})\b/);
   if (!match) return explanation;
 
   const id = Number(match[1]);
-  const seed = becauseById.get(id);
+  const seed = becauseMap.get(id) ?? (mediaType ? becauseMap.get(`${mediaType}:${id}`) : null);
   if (!seed?.title) return explanation;
 
   return explanation.replace(match[1], seed.title);

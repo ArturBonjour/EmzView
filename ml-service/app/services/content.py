@@ -93,3 +93,8 @@ def recommend_by_text(query_text: str, limit: int = 20) -> List[Tuple[int, float
     candidates = [(model.ids[i], float(sims[i])) for i in range(len(model.ids))]
     candidates.sort(key=lambda x: x[1], reverse=True)
     return candidates[:limit]
+
+
+def get_media_type(tmdb_id: int) -> str | None:
+    model = get_content_model()
+    return model.meta.get(int(tmdb_id), {}).get("media_type")
