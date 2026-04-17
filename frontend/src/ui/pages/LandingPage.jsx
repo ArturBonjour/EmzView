@@ -55,8 +55,20 @@ export function LandingPage() {
             <div className="landing-feature__desc">Главная лента по вашему вкусу — обновляется после каждой оценки.</div>
           </div>
           <div className="landing-feature">
+            <div className="landing-feature__title">По настроению</div>
+            <div className="landing-feature__desc">Выберите одно из 7 настроений — весёлое, грустное, напряжённое, романтичное и другие.</div>
+          </div>
+          <div className="landing-feature">
             <div className="landing-feature__title">Потому что…</div>
             <div className="landing-feature__desc">Похожие по атмосфере и стилю — от ваших последних лайков.</div>
+          </div>
+          <div className="landing-feature">
+            <div className="landing-feature__title">Telegram-бот</div>
+            <div className="landing-feature__desc">Рекомендации, лайки и список «хочу посмотреть» прямо в Telegram — один аккаунт, всё синхронизировано.</div>
+          </div>
+          <div className="landing-feature">
+            <div className="landing-feature__title">Хочу посмотреть</div>
+            <div className="landing-feature__desc">Сохраняйте интересное в список и возвращайтесь, когда появится время.</div>
           </div>
           <div className="landing-feature">
             <div className="landing-feature__title">Подборки</div>

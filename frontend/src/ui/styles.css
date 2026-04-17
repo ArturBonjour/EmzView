@@ -1267,3 +1267,34 @@ a{color:inherit;}
 @media(min-width:640px){.card-grid{grid-template-columns:repeat(auto-fill,minmax(180px,1fr));}}
 @media(min-width:1024px){.card-grid{grid-template-columns:repeat(auto-fill,minmax(200px,1fr));}}
 
+
+/* ── Password field with show/hide toggle ──────────────────────────────── */
+.auth-pw-wrap{position:relative;}
+.auth-pw-wrap .auth-input{padding-right:42px;width:100%;}
+.auth-pw-toggle{
+  position:absolute;
+  right:10px;top:50%;transform:translateY(-50%);
+  background:none;border:none;cursor:pointer;
+  color:var(--muted);padding:4px;line-height:1;
+  display:flex;align-items:center;
+  transition:color var(--dur-2) var(--ease-out);
+}
+.auth-pw-toggle:hover{color:var(--text);}
+.auth-pw-toggle:focus-visible{outline:none;box-shadow:var(--ring);border-radius:6px;}
+
+/* ── Password strength indicator ──────────────────────────────────────── */
+.pw-strength{margin-top:5px;}
+.pw-strength__bar{
+  height:4px;border-radius:999px;
+  background:rgba(35,35,53,.9);
+  overflow:hidden;
+}
+.pw-strength__fill{
+  height:100%;border-radius:999px;
+  transition:width 220ms var(--ease-out),background 220ms var(--ease-out);
+}
+.pw-strength__fill--1{width:25%;background:#ff3d71;}
+.pw-strength__fill--2{width:50%;background:#ffb340;}
+.pw-strength__fill--3{width:75%;background:#7cfa9a;}
+.pw-strength__fill--4{width:100%;background:#22dd66;}
+.pw-strength__label{font-size:11px;color:var(--muted);margin-top:3px;}
