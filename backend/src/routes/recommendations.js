@@ -198,7 +198,7 @@ recommendationsRouter.get('/because', requireAuth, async (req, res, next) => {
 
 recommendationsRouter.get('/mood', requireAuth, async (req, res, next) => {
   try {
-    const mood = z.enum(['fun', 'sad', 'tense', 'chill']).parse(req.query.mood);
+    const mood = z.enum(['fun', 'sad', 'tense', 'chill', 'romantic', 'action', 'horror']).parse(req.query.mood);
     const limit = z.coerce.number().int().min(1).max(500).default(20).parse(req.query.limit ?? '20');
     const mediaType = z.enum(['movie', 'tv']).optional().parse(req.query.type);
 

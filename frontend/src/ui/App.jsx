@@ -11,6 +11,7 @@ import { CollectionsPage } from './pages/CollectionsPage.jsx';
 import { LandingPage } from './pages/LandingPage.jsx';
 import { SearchPage } from './pages/SearchPage.jsx';
 import { SettingsPage } from './pages/SettingsPage.jsx';
+import { WatchlistPage } from './pages/WatchlistPage.jsx';
 import { api, clearAuth, getStoredAuthToken, setAuthToken } from './lib/api.js';
 
 export default function App() {
@@ -184,6 +185,13 @@ export default function App() {
                       Рекомендации
                     </NavLink>
                     <NavLink
+                      to="/watchlist"
+                      className={({ isActive }) => `nav-link ${isActive ? 'nav-link--active' : ''}`}
+                      onClick={clearSearch}
+                    >
+                      Хочу посмотреть
+                    </NavLink>
+                    <NavLink
                       to="/collections"
                       className={({ isActive }) => `nav-link ${isActive ? 'nav-link--active' : ''}`}
                       onClick={clearSearch}
@@ -278,6 +286,10 @@ export default function App() {
           <Route
             path="/settings"
             element={authed && onboardingCompleted === false ? <Navigate to="/onboarding" replace /> : <SettingsPage />}
+          />
+          <Route
+            path="/watchlist"
+            element={authed && onboardingCompleted === false ? <Navigate to="/onboarding" replace /> : <WatchlistPage />}
           />
           <Route
             path="/collections"

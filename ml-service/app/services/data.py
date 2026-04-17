@@ -38,7 +38,9 @@ def load_movies_for_content() -> Tuple[List[int], List[str], Dict[int, Dict]]:
         cast = " ".join([c for c in (d.get("cast") or []) if c])
         keywords = " ".join([k for k in (d.get("keywords") or []) if k])
 
-        text = f"{title} {overview} {genres} {cast} {keywords}".strip()
+        # Boost title (×3) and genres (×2) relative to other fields so that
+        # the TF-IDF vectors emphasise the most discriminative attributes.
+        text = f"{title} {title} {title} {genres} {genres} {overview} {cast} {keywords}".strip()
 
         ids.append(tmdb_id)
         texts.append(text)

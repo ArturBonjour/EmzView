@@ -528,6 +528,17 @@ a{color:inherit;}
 .icon-btn:focus-visible{outline:none;box-shadow:var(--ring);border-color:rgba(255,61,113,.65);}
 .icon-btn--likeActive{border-color:rgba(124,252,154,.9);box-shadow:0 0 0 6px rgba(124,252,154,.12);}
 .icon-btn--dislikeActive{border-color:rgba(255,107,107,.9);box-shadow:0 0 0 6px rgba(255,107,107,.10);}
+.icon-btn--watchlistActive{border-color:rgba(255,200,80,.9);box-shadow:0 0 0 6px rgba(255,200,80,.12);}
+
+.card-watchlist-badge{
+  position:absolute;
+  top:8px;
+  right:8px;
+  font-size:16px;
+  z-index:3;
+  line-height:1;
+  filter:drop-shadow(0 1px 2px rgba(0,0,0,.5));
+}
 
 .errorBoundary__details{
   white-space:pre-wrap;
@@ -1246,3 +1257,13 @@ a{color:inherit;}
   from{transform:translateY(8px);opacity:0;}
   to{transform:translateY(0);opacity:1;}
 }
+
+.card-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(160px,1fr));
+  gap:16px;
+  padding:0;
+}
+@media(min-width:640px){.card-grid{grid-template-columns:repeat(auto-fill,minmax(180px,1fr));}}
+@media(min-width:1024px){.card-grid{grid-template-columns:repeat(auto-fill,minmax(200px,1fr));}}
+

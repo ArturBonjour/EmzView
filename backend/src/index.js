@@ -15,6 +15,7 @@ import { actionsRouter } from './routes/actions.js';
 import { recommendationsRouter } from './routes/recommendations.js';
 import { usersRouter } from './routes/users.js';
 import { devRouter } from './routes/dev.js';
+import { watchlistRouter } from './routes/watchlist.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -63,6 +64,7 @@ app.use('/api/movies', moviesRouter);
 app.use('/api/actions', actionsRouter);
 app.use('/api/recommendations', recommendationsRouter);
 app.use('/api/users', usersRouter);
+app.use('/api/watchlist', watchlistRouter);
 app.use('/api/dev', devRouter);
 
 app.use(notFoundHandler);

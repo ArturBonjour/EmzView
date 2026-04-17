@@ -6,13 +6,20 @@ import { toastError, toastSuccess } from '../lib/toast.js';
 
 const ratingCache = new Map();
 const inflightRating = new Map();
+const watchlistCache = new Map();
+const inflightWatchlist = new Map();
 
 export const PosterCard = React.memo(function PosterCard({ item, onRated }) {
   const [busy, setBusy] = useState(false);
+  const [watchBusy, setWatchBusy] = useState(false);
   const [flash, setFlash] = useState(null);
   const [rating, setRating] = useState(() => {
     const k = `${item?.mediaType}:${item?.tmdbId}`;
     return ratingCache.has(k) ? ratingCache.get(k) : null;
+  });
+  const [inWatchlist, setInWatchlist] = useState(() => {
+    const k = `${item?.mediaType}:${item?.tmdbId}`;
+    return watchlistCache.has(k) ? watchlistCache.get(k) : false;
   });
   const timerRef = useRef(null);
 
@@ -62,6 +69,41 @@ export const PosterCard = React.memo(function PosterCard({ item, onRated }) {
     const tmdbId = item?.tmdbId;
     const mediaType = item?.mediaType;
     if (!tmdbId || !mediaType) return;
+
+    const k = `${mediaType}:${tmdbId}`;
+    if (watchlistCache.has(k)) {
+      setInWatchlist(watchlistCache.get(k));
+      return;
+    }
+
+    if (inflightWatchlist.has(k)) {
+      inflightWatchlist.get(k).then((v) => setInWatchlist(v));
+      return;
+    }
+
+    const p = api
+      .get(`/api/watchlist/status?tmdbId=${tmdbId}&type=${mediaType}`)
+      .then((res) => {
+        const v = Boolean(res?.data?.inWatchlist);
+        watchlistCache.set(k, v);
+        return v;
+      })
+      .catch(() => {
+        watchlistCache.set(k, false);
+        return false;
+      })
+      .finally(() => {
+        inflightWatchlist.delete(k);
+      });
+
+    inflightWatchlist.set(k, p);
+    p.then((v) => setInWatchlist(v));
+  }, [item?.mediaType, item?.tmdbId]);
+
+  useEffect(() => {
+    const tmdbId = item?.tmdbId;
+    const mediaType = item?.mediaType;
+    if (!tmdbId || !mediaType) return;
     const k = `${mediaType}:${tmdbId}`;
 
     function onGlobalRating(e) {
@@ -74,8 +116,20 @@ export const PosterCard = React.memo(function PosterCard({ item, onRated }) {
       setRating(normalized);
     }
 
+    function onGlobalWatchlist(e) {
+      const detail = e?.detail;
+      if (!detail) return;
+      if (detail.key !== k) return;
+      watchlistCache.set(k, detail.inWatchlist);
+      setInWatchlist(detail.inWatchlist);
+    }
+
     window.addEventListener('emz:rating', onGlobalRating);
-    return () => window.removeEventListener('emz:rating', onGlobalRating);
+    window.addEventListener('emz:watchlist', onGlobalWatchlist);
+    return () => {
+      window.removeEventListener('emz:rating', onGlobalRating);
+      window.removeEventListener('emz:watchlist', onGlobalWatchlist);
+    };
   }, [item?.mediaType, item?.tmdbId]);
 
   async function rate(e, value) {
@@ -118,6 +172,34 @@ export const PosterCard = React.memo(function PosterCard({ item, onRated }) {
     }
   }
 
+  async function toggleWatchlist(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (watchBusy) return;
+
+    setWatchBusy(true);
+    const k = `${item.mediaType}:${item.tmdbId}`;
+    try {
+      if (inWatchlist) {
+        await api.delete(`/api/watchlist?tmdbId=${item.tmdbId}&type=${item.mediaType}`);
+        watchlistCache.set(k, false);
+        setInWatchlist(false);
+        window.dispatchEvent(new CustomEvent('emz:watchlist', { detail: { key: k, inWatchlist: false } }));
+        toastSuccess('Удалено из списка просмотра', { duration: 1800 });
+      } else {
+        await api.post('/api/watchlist', { tmdbId: item.tmdbId, mediaType: item.mediaType });
+        watchlistCache.set(k, true);
+        setInWatchlist(true);
+        window.dispatchEvent(new CustomEvent('emz:watchlist', { detail: { key: k, inWatchlist: true } }));
+        toastSuccess('Добавлено в список просмотра', { duration: 1800 });
+      }
+    } catch (err) {
+      toastError(formatApiError(err, 'Не удалось обновить список просмотра.'));
+    } finally {
+      setWatchBusy(false);
+    }
+  }
+
   const detailUrl = `/${item.mediaType || 'movie'}/${item.tmdbId}`;
 
   return (
@@ -130,6 +212,9 @@ export const PosterCard = React.memo(function PosterCard({ item, onRated }) {
             {rating === 1 ? <span className="card-badge card-badge--like">Лайк</span> : null}
             {rating === -1 ? <span className="card-badge card-badge--dislike">Дизлайк</span> : null}
           </div>
+          {inWatchlist ? (
+            <div className="card-watchlist-badge" title="В списке просмотра">🔖</div>
+          ) : null}
           {item.posterUrl ? <img src={item.posterUrl} alt={item.title} loading="lazy" /> : null}
           <div className="card-overlay">
             <div className="card-overlay-title">{item.title}</div>
@@ -154,6 +239,15 @@ export const PosterCard = React.memo(function PosterCard({ item, onRated }) {
                 aria-label="Дизлайк"
               >
                 👎
+              </button>
+              <button
+                className={`icon-btn ${inWatchlist ? 'icon-btn--watchlistActive' : ''}`}
+                onClick={toggleWatchlist}
+                disabled={watchBusy}
+                aria-label={inWatchlist ? 'Убрать из списка' : 'В список просмотра'}
+                title={inWatchlist ? 'Убрать из списка просмотра' : 'Добавить в список просмотра'}
+              >
+                🔖
               </button>
             </div>
 

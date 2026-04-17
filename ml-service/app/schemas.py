@@ -35,7 +35,7 @@ class BecauseRequest(BaseModel):
 
 
 class MoodRequest(BaseModel):
-    mood: Literal["fun", "sad", "tense", "chill"]
+    mood: Literal["fun", "sad", "tense", "chill", "romantic", "action", "horror"]
     limit: int = 20
 
 
