@@ -318,7 +318,7 @@ async function hydrateRecommendations(recommendations, mediaTypeFilter) {
 
   const hydrated = normalized
     .map((r) => {
-      const m = r.mediaType ? byKey.get(`${r.mediaType}:${r.tmdbId}`) : byId.get(r.tmdbId);
+      const m = (r.mediaType ? byKey.get(`${r.mediaType}:${r.tmdbId}`) : null) ?? byId.get(r.tmdbId);
       if (!m) return null;
       if (mediaTypeFilter && m.mediaType !== mediaTypeFilter) return null;
       const becauseMap = r.mediaType ? becauseByKey : becauseById;
@@ -371,7 +371,7 @@ function rewriteExplanation(explanation, becauseMap, mediaType) {
   if (!match) return explanation;
 
   const id = Number(match[1]);
-  const seed = becauseMap.get(id) ?? (mediaType ? becauseMap.get(`${mediaType}:${id}`) : null);
+  const seed = (mediaType ? becauseMap.get(`${mediaType}:${id}`) : null) ?? becauseMap.get(id);
   if (!seed?.title) return explanation;
 
   return explanation.replace(match[1], seed.title);
