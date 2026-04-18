@@ -1547,7 +1547,7 @@ Docker Compose конфигурация.
 | mongo | mongo:6 | 27017 | -- | mongo_data |
 | ollama | ollama/ollama:latest | 11434 | -- | ollama_data |
 | backend | ./backend (Dockerfile) | 8080 | mongo, ollama | -- |
-| ml-service | ./ml-service (Dockerfile) | 8000 | -- | ./ml-service/models |
+| ml-service | ./ml-service (Dockerfile) | 8000 | mongo | ./ml-service/models |
 | telegram-bot | ./telegram-bot (Dockerfile) | -- | backend | -- |
 | frontend | ./frontend (Dockerfile) | 5173 | backend | -- |
 
@@ -1717,8 +1717,8 @@ Docker Compose конфигурация.
 | UI-03 | Онбординг: бесконечная прокрутка | При прокрутке к нижнему sentinel загружается следующая страница | PASS |
 | UI-04 | Онбординг: блокировка кнопки | Кнопка неактивна при выборе < 12 объектов | PASS |
 | UI-05 | Главная: skeleton-состояния | До загрузки данных видны skeleton-заглушки | PASS |
-| UI-06 | Карточка: лайк | Нажатие 👍 -- badge "Лайк" появляется на карточке | PASS |
-| UI-07 | Карточка: дизлайк | Нажатие 👎 -- badge "Дизлайк" появляется на карточке | PASS |
+| UI-06 | Карточка: лайк | Нажатие 👍 -- badge «Лайк» появляется на карточке | PASS |
+| UI-07 | Карточка: дизлайк | Нажатие 👎 -- badge «Дизлайк» появляется на карточке | PASS |
 | UI-08 | Карточка: watchlist | Нажатие 🔖 -- иконка-badge добавляется на карточку | PASS |
 | UI-09 | Синхронизация оценок | Лайк на одной карточке отражается на копии в другой витрине | PASS |
 | UI-10 | Темная/светлая тема | Переключение меняет цветовую схему без перезагрузки | PASS |
@@ -1985,7 +1985,8 @@ export function requireAuth(req, res, next) {
   }
 
   try {
-    req.user = jwt.verify(token, process.env.JWT_SECRET);
+    const payload = jwt.verify(token, process.env.JWT_SECRET);
+    req.user = payload;
     return next();
   } catch {
     return res.status(401).json({ error: 'Unauthorized' });

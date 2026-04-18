@@ -61,7 +61,7 @@ def recommend_for_user(user_id: str, liked_item_ids: List[int], limit: int = 20)
     return out[:limit]
 
 
-def recommend_from_similar_users(user_id: str, liked_item_ids: List[int], limit: int = 20, k_neighbors: int = 20) -> Tuple[List[Tuple[int, float]], int]:
+def recommend_from_similar_users(user_id: str, liked_item_ids: List[int], limit: int = 20, k_neighbors: int = 30) -> Tuple[List[Tuple[int, float]], int]:
     """User-user CF.
 
     Returns:

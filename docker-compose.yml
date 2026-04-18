@@ -47,6 +47,8 @@ services:
     #   - ./ml-service/app:/app/app
     volumes:
       - ./ml-service/models:/app/models
+    depends_on:
+      - mongo
     networks:
       - emz-net
 
