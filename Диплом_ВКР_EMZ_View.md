@@ -1031,7 +1031,7 @@ export function requireAuth(req, res, next) {
 async function getRatingsSignature(userId) {
   const [count, last] = await Promise.all([
     Rating.countDocuments({ userId }),
-    Rating.findOne({ userId }).sort({ updatedAt: -1 }).select({ updatedAt: 1 }).lean(),
+    Rating.findOne({ userId }).sort({ updatedAt: -1, _id: -1 }).select({ updatedAt: 1 }).lean(),
   ]);
   const t = last?.updatedAt ? new Date(last.updatedAt).toISOString() : 'none';
   return `${count}:${t}`;
