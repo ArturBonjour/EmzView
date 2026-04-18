@@ -19,6 +19,12 @@ OUTPUT="$SCRIPT_DIR/Диплом_ВКР_EMZ_View.docx"
 REFERENCE="$SCRIPT_DIR/diploma_reference.docx"
 LUA_FILTER="$SCRIPT_DIR/pagebreak.lua"
 
+# Optional flag: --force-recreate  →  removes cached reference.docx first
+if [[ "${1:-}" == "--force-recreate" ]]; then
+  rm -f "$REFERENCE"
+  echo "INFO: diploma_reference.docx removed — will recreate"
+fi
+
 # ─── 0. pandoc ────────────────────────────────────────────────────────────────
 if ! command -v pandoc &>/dev/null; then
   echo "ERR: pandoc not found."
@@ -61,15 +67,15 @@ from docx.oxml import OxmlElement
 out = sys.argv[1]
 doc = Document()
 
-# Page margins
+# Page margins: GOST (left 30mm, right 15mm, top 20mm, bottom 20mm)
 sec = doc.sections[0]
 sec.left_margin = Cm(3.0)
 sec.right_margin = Cm(1.5)
 sec.top_margin = Cm(2.0)
 sec.bottom_margin = Cm(2.0)
-sec.footer_distance = Cm(1.5)
+sec.footer_distance = Cm(1.25)
 
-# Footer: page number, centered, 12pt Times New Roman
+# Footer: centered page number, 12pt Times New Roman, starting from page 2
 fp = sec.footer.paragraphs[0]
 fp.alignment = WD_ALIGN_PARAGRAPH.CENTER
 run = fp.add_run()
@@ -85,11 +91,11 @@ for tag, ftype in [('begin', None), (None, 'PAGE'), ('end', None)]:
 run.font.name = 'Times New Roman'
 run.font.size = Pt(12)
 
-# Normal style
+# Normal style: TNR 14pt, justified, 1.5 line spacing, 1.25cm first-line indent
 ns = doc.styles['Normal']
 ns.font.name = 'Times New Roman'
 ns.font.size = Pt(14)
-ns.font.color.rgb = RGBColor(0,0,0)
+ns.font.color.rgb = RGBColor(0, 0, 0)
 ns.font.bold = False
 ns.font.italic = False
 pf = ns.paragraph_format
@@ -99,7 +105,7 @@ pf.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
 pf.space_after = Pt(0)
 pf.space_before = Pt(0)
 
-# Heading styles
+# Heading styles: TNR 14pt, centered, no bold, no indent
 for level in (1, 2, 3):
     try:
         hs = doc.styles[f'Heading {level}']
@@ -107,7 +113,7 @@ for level in (1, 2, 3):
         hs = doc.styles.add_style(f'Heading {level}', WD_STYLE_TYPE.PARAGRAPH)
     hs.font.name = 'Times New Roman'
     hs.font.size = Pt(14)
-    hs.font.color.rgb = RGBColor(0,0,0)
+    hs.font.color.rgb = RGBColor(0, 0, 0)
     hs.font.bold = False
     hs.font.italic = False
     hpf = hs.paragraph_format
@@ -116,11 +122,49 @@ for level in (1, 2, 3):
     hpf.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
     hpf.space_before = Pt(12 if level == 1 else 6)
     hpf.space_after = Pt(12 if level == 1 else 6)
+    hpf.keep_with_next = True  # heading stays with following text
+
+# Code / Verbatim block style: Courier New 10pt, single spacing, no indent
+for style_name in ('Verbatim Char', 'Verbatim', 'Code', 'Source Code'):
+    try:
+        cs = doc.styles[style_name]
+        cs.font.name = 'Courier New'
+        cs.font.size = Pt(10)
+        cs.font.bold = False
+        cs.font.italic = False
+    except Exception:
+        pass
+
+# Table Normal style
+try:
+    ts = doc.styles['Table Normal']
+    ts.font.name = 'Times New Roman'
+    ts.font.size = Pt(12)
+    tspf = ts.paragraph_format
+    tspf.first_line_indent = Cm(0)
+    tspf.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    tspf.space_before = Pt(0)
+    tspf.space_after = Pt(0)
+except Exception:
+    pass
+
+# Body Text style (pandoc uses this for paragraphs sometimes)
+try:
+    bt = doc.styles['Body Text']
+    bt.font.name = 'Times New Roman'
+    bt.font.size = Pt(14)
+    bt.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+    bt.paragraph_format.first_line_indent = Cm(1.25)
+    bt.paragraph_format.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
+    bt.paragraph_format.space_after = Pt(0)
+    bt.paragraph_format.space_before = Pt(0)
+except Exception:
+    pass
 
 doc.save(out)
 print(f"Created: {out}")
 PYEOF
-    echo "reference.docx created via python-docx (GOST formatting applied)"
+    echo "reference.docx created via python-docx (GOST formatting: TNR14, 1.5 line, margins 30/15/20/20)"
 
   elif pandoc --print-default-data-file reference.docx > "$REFERENCE" 2>/dev/null; then
     echo "reference.docx created from pandoc default template"
