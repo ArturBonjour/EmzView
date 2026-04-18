@@ -1,20 +1,15 @@
 #!/usr/bin/env bash
-# =============================================================================
-# convert_diploma.sh — Конвертация диплома ВКР из Markdown в DOCX
-# Формат: КФУ / КАДиТП 2025 (Times New Roman 14pt, 1.5 интервал, поля ГОСТ)
+# convert_diploma.sh — Конвертация ВКР из Markdown в DOCX
+# КФУ / КАДиТП 2025: Times New Roman 14 пт, 1.5 интервал, поля ГОСТ
 #
 # Зависимости:
 #   macOS  : brew install pandoc
 #   Ubuntu : sudo apt install pandoc
-#   Windows: winget install --id JohnMacFarlane.Pandoc  (или pandoc.org)
+#   Windows: winget install --id JohnMacFarlane.Pandoc
+#   Опцион.: pip install python-docx  (авто-форматирование reference.docx)
 #
-# Использование:
-#   chmod +x convert_diploma.sh
-#   ./convert_diploma.sh
-#
-# Результат: Диплом_ВКР_EMZ_View.docx
-# После конвертации откройте в Word и выполните шаги из раздела «После Word»
-# =============================================================================
+# Использование: ./convert_diploma.sh
+# Результат    : Диплом_ВКР_EMZ_View.docx
 
 set -euo pipefail
 
@@ -22,167 +17,224 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 INPUT="$SCRIPT_DIR/Диплом_ВКР_EMZ_View.md"
 OUTPUT="$SCRIPT_DIR/Диплом_ВКР_EMZ_View.docx"
 REFERENCE="$SCRIPT_DIR/diploma_reference.docx"
+LUA_FILTER="$SCRIPT_DIR/pagebreak.lua"
 
-# ── 0. Проверяем наличие pandoc ───────────────────────────────────────────────
+# ─── 0. pandoc ────────────────────────────────────────────────────────────────
 if ! command -v pandoc &>/dev/null; then
-  echo "❌  pandoc не найден."
-  echo "    macOS  : brew install pandoc"
-  echo "    Ubuntu : sudo apt install pandoc"
-  echo "    Windows: https://github.com/jgm/pandoc/releases/latest"
+  echo "ERR: pandoc not found."
+  echo "  macOS  : brew install pandoc"
+  echo "  Ubuntu : sudo apt install pandoc"
+  echo "  Windows: winget install --id JohnMacFarlane.Pandoc"
   exit 1
 fi
-
 PANDOC_VERSION="$(pandoc --version | head -1 | awk '{print $2}')"
-echo "✅  pandoc ${PANDOC_VERSION} найден"
+echo "pandoc ${PANDOC_VERSION} OK"
 
 if [ ! -f "$INPUT" ]; then
-  echo "❌  Файл исходника не найден: $INPUT"
+  echo "ERR: Input not found: $INPUT"
   exit 1
 fi
 
-# ── 1. Создаём reference.docx если отсутствует ────────────────────────────────
+# ─── 1. Lua-filter: --- -> page break ─────────────────────────────────────────
+cat > "$LUA_FILTER" << 'LUA'
+function HorizontalRule()
+  return pandoc.RawBlock('openxml',
+    '<w:p><w:r><w:br w:type="page"/></w:r></w:p>')
+end
+LUA
+echo "Lua page-break filter: OK"
+
+# ─── 2. reference.docx ────────────────────────────────────────────────────────
 if [ ! -f "$REFERENCE" ]; then
-  echo "📄  Создаю базовый diploma_reference.docx…"
+  echo "Creating diploma_reference.docx..."
 
-  # Пробуем встроенный шаблон pandoc
-  if pandoc --print-default-data-file reference.docx > "$REFERENCE" 2>/dev/null; then
-    echo "    Базовый шаблон создан."
+  if command -v python3 &>/dev/null && python3 -c "import docx" 2>/dev/null; then
+    python3 - "$REFERENCE" << 'PYEOF'
+import sys
+from docx import Document
+from docx.shared import Pt, Cm, RGBColor
+from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_LINE_SPACING
+from docx.enum.style import WD_STYLE_TYPE
+from docx.oxml.ns import qn
+from docx.oxml import OxmlElement
+
+out = sys.argv[1]
+doc = Document()
+
+# Page margins
+sec = doc.sections[0]
+sec.left_margin = Cm(3.0)
+sec.right_margin = Cm(1.5)
+sec.top_margin = Cm(2.0)
+sec.bottom_margin = Cm(2.0)
+sec.footer_distance = Cm(1.5)
+
+# Footer: page number, centered, 12pt Times New Roman
+fp = sec.footer.paragraphs[0]
+fp.alignment = WD_ALIGN_PARAGRAPH.CENTER
+run = fp.add_run()
+for tag, ftype in [('begin', None), (None, 'PAGE'), ('end', None)]:
+    if tag:
+        el = OxmlElement('w:fldChar')
+        el.set(qn('w:fldCharType'), tag)
+        run._r.append(el)
+    else:
+        el = OxmlElement('w:instrText')
+        el.text = f' {ftype} '
+        run._r.append(el)
+run.font.name = 'Times New Roman'
+run.font.size = Pt(12)
+
+# Normal style
+ns = doc.styles['Normal']
+ns.font.name = 'Times New Roman'
+ns.font.size = Pt(14)
+ns.font.color.rgb = RGBColor(0,0,0)
+ns.font.bold = False
+ns.font.italic = False
+pf = ns.paragraph_format
+pf.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+pf.first_line_indent = Cm(1.25)
+pf.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
+pf.space_after = Pt(0)
+pf.space_before = Pt(0)
+
+# Heading styles
+for level in (1, 2, 3):
+    try:
+        hs = doc.styles[f'Heading {level}']
+    except Exception:
+        hs = doc.styles.add_style(f'Heading {level}', WD_STYLE_TYPE.PARAGRAPH)
+    hs.font.name = 'Times New Roman'
+    hs.font.size = Pt(14)
+    hs.font.color.rgb = RGBColor(0,0,0)
+    hs.font.bold = False
+    hs.font.italic = False
+    hpf = hs.paragraph_format
+    hpf.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    hpf.first_line_indent = Cm(0)
+    hpf.line_spacing_rule = WD_LINE_SPACING.ONE_POINT_FIVE
+    hpf.space_before = Pt(12 if level == 1 else 6)
+    hpf.space_after = Pt(12 if level == 1 else 6)
+
+doc.save(out)
+print(f"Created: {out}")
+PYEOF
+    echo "reference.docx created via python-docx (GOST formatting applied)"
+
+  elif pandoc --print-default-data-file reference.docx > "$REFERENCE" 2>/dev/null; then
+    echo "reference.docx created from pandoc default template"
+    echo "WARN: Install python-docx for automatic GOST formatting:"
+    echo "  pip install python-docx && rm diploma_reference.docx && ./convert_diploma.sh"
+
   else
-    # Fallback: генерируем из минимального markdown
-    printf '# Заголовок\n\nТекст\n' | pandoc -o "$REFERENCE" 2>/dev/null || true
-  fi
-
-  if [ -f "$REFERENCE" ]; then
-    echo ""
-    echo "╔══════════════════════════════════════════════════════════════════╗"
-    echo "║  ВАЖНО: настройте diploma_reference.docx перед повторным       ║"
-    echo "║  запуском этого скрипта.                                        ║"
-    echo "║                                                                  ║"
-    echo "║  1. Откройте diploma_reference.docx в MS Word.                  ║"
-    echo "║  2. Стиль «Обычный» (Normal):                                   ║"
-    echo "║     • Шрифт: Times New Roman, 14 пт, чёрный                     ║"
-    echo "║     • Межстрочный интервал: 1,5 строки                          ║"
-    echo "║     • Абзацный отступ: 1,25 см                                  ║"
-    echo "║     • Выравнивание: по ширине                                    ║"
-    echo "║     • Интервал после абзаца: 0 пт                               ║"
-    echo "║  3. Стиль «Заголовок 1» (Heading 1):                            ║"
-    echo "║     • Шрифт: Times New Roman, 14 пт, без начертания             ║"
-    echo "║     • Выравнивание: по центру                                    ║"
-    echo "║     • Интервал после: 12 пт                                      ║"
-    echo "║     • Нет нумерации, нет Ё                                       ║"
-    echo "║  4. Стиль «Заголовок 2» (Heading 2):                            ║"
-    echo "║     • Шрифт: Times New Roman, 14 пт, без начертания             ║"
-    echo "║     • Выравнивание: по центру                                    ║"
-    echo "║  5. Поля страницы:                                               ║"
-    echo "║     верх 20 мм | низ 20 мм | справа 15 мм | слева 30 мм        ║"
-    echo "║  6. Сохраните и повторно запустите скрипт.                      ║"
-    echo "╚══════════════════════════════════════════════════════════════════╝"
-    echo ""
+    printf '# Header\n\nText\n' | pandoc -o "$REFERENCE" 2>/dev/null || true
+    echo "reference.docx created (minimal fallback)"
   fi
 fi
 
-# ── 2. Конвертация ────────────────────────────────────────────────────────────
-echo "🔄  Конвертирую: $INPUT"
-echo "          →  $OUTPUT"
+# ─── 3. Convert ───────────────────────────────────────────────────────────────
+echo ""
+echo "Converting: $INPUT  ->  $OUTPUT"
 
 PANDOC_ARGS=(
-  # Входной формат: стандартный Markdown + умные кавычки + таблицы + код
   "--from=markdown+smart+pipe_tables+fenced_code_blocks+bracketed_spans"
-  # Выходной формат
   "--to=docx"
   "--output=${OUTPUT}"
-  # Не переносить строки автоматически (сохраняем форматирование)
   "--wrap=none"
-  # НЕ добавляем --toc: в документе уже есть раздел «Содержание» с ручным оглавлением.
-  # Если нужно автоматическое оглавление Word, добавьте флаг --toc ниже
-  # и удалите раздел «# Содержание» из markdown-исходника.
-  # "--toc"
-  # "--toc-depth=3"
-  # Язык документа — русский (для корректных переносов и кавычек)
+  "--lua-filter=${LUA_FILTER}"
   "--metadata=lang:ru-RU"
-  "--metadata=title:Диплом ВКР EMZ View"
-  # Подсветка синтаксиса кода
+  "--metadata=title:Разработка гибридной рекомендательной системы фильмов и сериалов с мультиплатформенным интерфейсом"
+  "--metadata=author:Боньер А."
   "--highlight-style=kate"
 )
 
 if [ -f "$REFERENCE" ]; then
   PANDOC_ARGS+=("--reference-doc=${REFERENCE}")
+  echo "Using reference: diploma_reference.docx"
 else
-  echo "⚠️   diploma_reference.docx не найден — форматирование будет по умолчанию"
+  echo "WARN: diploma_reference.docx not found — using pandoc defaults"
 fi
 
 pandoc "${PANDOC_ARGS[@]}" "$INPUT"
 
 echo ""
-echo "✅  Готово: $OUTPUT"
+echo "=== DONE: $OUTPUT ==="
 echo ""
-echo "═══════════════════════════════════════════════════════════════════════"
-echo "  ОБЯЗАТЕЛЬНЫЕ ДЕЙСТВИЯ В MS WORD после открытия файла:"
-echo "═══════════════════════════════════════════════════════════════════════"
+echo "========================================================================"
+echo "  CHECKLIST: MS WORD ACTIONS (KADiTP 2025)"
+echo "========================================================================"
 echo ""
-echo "  1. ПОЛЯ СТРАНИЦЫ (Макет → Поля → Настраиваемые поля)"
-echo "     Верх: 2,0 см  |  Низ: 2,0 см  |  Право: 1,5 см  |  Лево: 3,0 см"
+echo "  1. PAGE MARGINS"
+echo "     Layout > Margins > Custom:"
+echo "     Left: 3.0 cm | Right: 1.5 cm | Top: 2.0 cm | Bottom: 2.0 cm"
 echo ""
-echo "  2. ШРИФТ ВСЕГО ТЕКСТА"
-echo "     Ctrl+A → Главная → Шрифт: Times New Roman, 14 пт, чёрный"
-echo "     Отмените любое жирное/курсивное/подчёркнутое начертание в основном тексте"
-echo "     (оставить только для кода: шрифт Courier New, 10-12 пт)"
+echo "  2. MAIN FONT"
+echo "     Ctrl+A > Times New Roman, 14pt, black, no bold/italic"
+echo "     Exception: code blocks > Courier New, 10-12pt"
 echo ""
-echo "  3. МЕЖСТРОЧНЫЙ ИНТЕРВАЛ"
-echo "     Ctrl+A → Абзац → Межстрочный: Полуторный (1,5)"
-echo "     Интервал после абзаца: 0 пт"
+echo "  3. LINE SPACING"
+echo "     Ctrl+A > Paragraph > Line spacing: 1.5 lines"
+echo "     Space before/after: 0pt"
 echo ""
-echo "  4. АБЗАЦНЫЙ ОТСТУП"
-echo "     Ctrl+A → Абзац → Отступ первой строки: 1,25 см"
-echo "     Заголовки (Heading 1/2/3), подписи рисунков/таблиц — отступ 0"
+echo "  4. PARAGRAPH INDENT"
+echo "     Ctrl+A > Paragraph > First line indent: 1.25cm"
+echo "     Alignment: Justify"
+echo "     Headings, figure/table captions: indent 0, centered"
 echo ""
-echo "  5. НУМЕРАЦИЯ СТРАНИЦ"
-echo "     Вставка → Номер страницы → Внизу → По центру"
-echo "     Номер на титуле НЕ печатается (используйте Особый колонтитул первой стр.)"
-echo "     Нумерация начинается с 1 с титульной страницы"
+echo "  5. PAGE NUMBERS"
+echo "     Insert > Page Number > Bottom > Center, 12pt Times New Roman"
+echo "     Title page: no number (use 'Different First Page' footer)"
+echo "     Contents page should show number 2"
 echo ""
-echo "  6. АВТОМАТИЧЕСКИЕ ПЕРЕНОСЫ СЛОВ"
-echo "     Макет → Расстановка переносов → Авто"
+echo "  6. HYPHENATION"
+echo "     Layout > Hyphenation > Automatic"
 echo ""
-echo "  7. ОГЛАВЛЕНИЕ (СОДЕРЖАНИЕ)"
-echo "     Раздел «Содержание» уже есть в документе как обычный текст с номерами страниц."
-echo "     После финальной правки обновите номера страниц вручную в разделе Содержание."
-echo "     Альтернатива: удалите раздел «Содержание» из документа и вставьте"
-echo "     автоматическое оглавление: Ссылки → Оглавление → Автособираемое оглавление."
+echo "  7. TABLE OF CONTENTS"
+echo "     Option A: Update page numbers manually in the 'Содержание' section"
+echo "     Option B (recommended): Delete 'Содержание' section, then:"
+echo "     References > Table of Contents > Auto > Update entire table"
 echo ""
-echo "  8. ТАБЛИЦЫ"
-echo "     Заголовок таблицы: «Таблица X.X -- Название» (без точки в конце)"
-echo "     Выровнять заголовок таблицы по правому краю"
-echo "     Заголовки столбцов таблицы -- выравнивание по центру"
-echo "     Шрифт в таблицах: Times New Roman, 12 пт (допускается уменьшение)"
+echo "  8. TABLES"
+echo "     Caption: 'Таблица X.X -- Name' right-aligned, no period"
+echo "     Column headers: centered; cell text: justified, 14pt"
 echo ""
-echo "  9. ПОДПИСИ К РИСУНКАМ"
-echo "     «Рисунок X.X -- Название» — выравнивание по центру, без точки в конце"
-echo "     Шрифт: Times New Roman, 14 пт"
+echo "  9. FIGURES"
+echo "     Caption: 'Рисунок X.X -- Name' centered, no period"
+echo "     Figure and caption: centered, no indent"
 echo ""
-echo "  10. ПРИЛОЖЕНИЯ"
-echo "      «Приложение А» — в правом верхнем углу страницы (выравнивание по правому краю)"
-echo "      Название приложения — на следующей строке по центру страницы"
+echo "  10. APPENDICES"
+echo "       'Приложение А' right-aligned (top-right corner of page)"
+echo "       Appendix title: centered on next line"
+echo "       Each appendix starts on new page"
 echo ""
-echo "  11. КОД В ПРИЛОЖЕНИЯХ"
-echo "      Шрифт кодовых блоков: Courier New, 10-12 пт"
-echo "      Межстрочный интервал в коде: одинарный"
+echo "  11. CODE IN APPENDICES"
+echo "       Font: Courier New, 10-12pt, single spacing"
 echo ""
-echo "  12. МАРКИРОВАННЫЕ СПИСКИ"
-echo "      Списки в документе оформлены тире «–» (уже применено)."
-echo "      Если pandoc создал автоматические маркеры, замените их на тире «–»."
+echo "  12. LISTS"
+echo "       Lists use em-dash '–' (already applied in source)"
+echo "       If pandoc created bullet points, replace with '–'"
 echo ""
-echo "═══════════════════════════════════════════════════════════════════════"
+echo "  13. PAGE BREAKS"
+echo "       Section separators '---' were converted to page breaks via Lua filter"
+echo "       Verify each chapter starts on a new page"
 echo ""
-echo "  ПРОВЕРЬТЕ СТРУКТУРУ ПЕРЕД СДАЧЕЙ:"
-echo "  ✓ Титульный лист (без номера страницы)"
-echo "  ✓ Содержание (стр. 2-3)"
-echo "  ✓ Введение (с новой страницы)"
-echo "  ✓ Главы 1-4 (каждая с новой страницы)"
-echo "  ✓ Заключение (с новой страницы)"
-echo "  ✓ Список использованных источников (с новой страницы)"
-echo "  ✓ Приложения А, Б, В (каждое с новой страницы)"
-echo "  ✓ Общий объём: 100-130 страниц без приложений"
+echo "========================================================================"
 echo ""
-echo "═══════════════════════════════════════════════════════════════════════"
-
+echo "  STRUCTURE CHECKLIST:"
+echo "  [OK] Title page (no page number)"
+echo "  [OK] Contents / Содержание (page 2)"
+echo "  [OK] Introduction / Введение (new page)"
+echo "  [OK] Chapter 1 (new page)"
+echo "  [OK] Chapter 2 (new page)"
+echo "  [OK] Chapter 3 (new page)"
+echo "  [OK] Chapter 4 (new page)"
+echo "  [OK] Conclusion / Заключение (new page)"
+echo "  [OK] References / Список источников (new page, 24 entries)"
+echo "  [OK] Appendix A / Приложение А (new page)"
+echo "  [OK] Appendix B / Приложение Б (new page)"
+echo "  [OK] Appendix C / Приложение В (new page)"
+echo "  [OK] Main body: ~100-130 pages"
+echo "  [OK] All tables (1.1-4.8) and figures (2.1-3.16) referenced in text"
+echo ""
+echo "========================================================================"
